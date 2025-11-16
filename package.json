@@ -6,7 +6,9 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "check-types": "turbo run check-types",
+    "docker:prune:auth": "turbo prune auth-service --docker",
+    "docker:up:example": "docker compose --env-file .env.example up"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
@@ -19,6 +21,6 @@
   "packageManager": "npm@11.6.2",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/**/*"
   ]
 }

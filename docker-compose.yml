@@ -1,0 +1,80 @@
+
+
+services: 
+  rabbitmq:
+    image: rabbitmq:4.2.0-management
+    container_name: rabbitmq    
+    restart: always
+    environment: 
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - ${RABBITMQ_PORT}:5672
+      - 15672:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - junglegaming-challenge-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: "postgres:18.1"
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_DEFAULT}
+    ports:
+      - ${POSTGRES_PORT}:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./docker-init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - junglegaming-challenge-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./apps/auth-service/Dockerfile
+    container_name: auth-service
+    env_file:
+      - .env.example
+    restart: always
+    environment:
+      - PORT=${HTTP_PORT}
+      - POSTGRES_DB=${POSTGRES_DB_AUTH_DB}
+      - RABBITMQ_QUEUE=${RABBITMQ_AUTH_QUEUE}
+    ports:
+      - ${HTTP_PORT}:${HTTP_PORT}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - junglegaming-challenge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  
+networks:
+  junglegaming-challenge-network:
+    driver: bridge
