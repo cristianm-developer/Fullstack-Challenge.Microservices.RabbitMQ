@@ -3,7 +3,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 const mockAuthService = {
-  login: jest.fn()
+  login: jest.fn(),
+  findAll: jest.fn(),
+  register: jest.fn(),
+  update: jest.fn(),
+  refreshToken: jest.fn(),
 }
 
 describe('AuthController', () => {
@@ -48,5 +52,16 @@ describe('AuthController', () => {
       expect(authService.login).toHaveBeenCalledWith({ usernameOrEmail: 'test@test.com', password: 'test' });
     });
     
+  });
+
+  describe('findAll', () => {
+    it('should call the auth service findAll method and return all users', async () => {
+      mockAuthService.findAll.mockResolvedValue([{
+        id: '1',
+        username: 'test',
+      }]);
+      const result = await authService.findAll();
+      expect(result).toBeDefined();
+    });
   });
 });

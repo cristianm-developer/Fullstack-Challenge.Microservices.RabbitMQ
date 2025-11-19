@@ -8,8 +8,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "docker:prune:auth": "turbo prune @repo/auth-service --docker",
-    "docker:up:example": "docker compose --env-file .env.example up",
-    "docker:build:auth": "docker build -f ./apps/auth-service/Dockerfile -t auth-service ."
+    "docker:prune:task": "turbo prune @repo/task-service --docker",
+    "docker:prune:api-gateway": "turbo prune @repo/api-gateway --docker",
+    "docker:prune:notification": "turbo prune @repo/notification-service --docker",
+    "docker:up:example": "docker compose --env-file .env.example up --build",
+    "docker:down": "docker-compose down -v",
+    "docker:build:auth": "docker build -f ./apps/auth-service/Dockerfile -t auth-service .",
+    "docker:build:notification": "docker build -f ./apps/notification-service/Dockerfile -t notification-service .",
+    "docker:build:api-gateway": "docker build -f ./apps/api-gateway/Dockerfile -t api-gateway ."
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
@@ -24,5 +30,8 @@
   "workspaces": [
     "apps/*",
     "packages/**/*"
-  ]
+  ],
+  "dependencies": {
+    "@nestjs/throttler": "^6.4.0"
+  }
 }

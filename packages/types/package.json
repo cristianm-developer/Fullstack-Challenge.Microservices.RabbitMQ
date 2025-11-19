@@ -26,6 +26,7 @@
     "src"
   ],
   "devDependencies": {
+    "@repo/typescript-config": "*",
     "rimraf": "^6.1.0",
     "typescript": "^5.7.2"
   }

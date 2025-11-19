@@ -24,6 +24,7 @@ const mockJwtService = {
   sign: jest.fn().mockImplementation((payload: any) => {
     return payload;
   }),
+  verify: jest.fn(),
 };
 
 const mockConfigService = {
@@ -239,6 +240,52 @@ describe('AuthService', () => {
         email: 'test-updated@test.com'
       };
       await expect(service.update(payload)).rejects.toThrow(`O usuario nao existe.`);
+    });
+
+  });
+
+  describe('refreshToken', () => {
+    it('should be defined', () => {
+      expect(service.refreshToken).toBeDefined();
+    });
+
+    it('should refresh a token and return a new JWT', async () => {
+      const payload = {
+        refreshToken: 'test-refresh-token',
+      };
+      mockJwtService.verify.mockReturnValue({ sub: 1 });
+      const result = service.refreshToken(payload);
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+      expect(result.expiresIn).toBeDefined();
+    });
+
+    it('should throw an error if the refresh token is invalid', async () => {
+      const payload = {
+        refreshToken: 'invalid-refresh-token',
+      };
+      mockJwtService.verify.mockImplementation(() => {
+        throw new UnauthorizedException('Token invalido');
+      });
+      expect(() => service.refreshToken(payload)).toThrow(UnauthorizedException);
+    });
+
+  });
+
+  describe('findAll', () => {
+    it('should be defined', () => {
+      expect(service.findAll).toBeDefined();
+    });
+
+    it('should find all users and return them', async () => {
+      mockRepository.find.mockResolvedValue([{
+        id: '1',
+        email: 'test@test.com',
+        username: 'test',
+        password: 'test',
+      }]);
+      const result = await service.findAll();
+      expect(result[0]).toBeDefined();
     });
 
   });

@@ -7,7 +7,7 @@ COPY package.json package-lock.json turbo.json .npmrc ./
 COPY packages packages
 COPY apps apps
 
-RUN turbo prune @repo/auth-service --docker
+RUN turbo prune @repo/task-service --docker
 
 # 2. Build Stage
 FROM node:20 AS builder
@@ -31,18 +31,15 @@ COPY --from=prepare /app/out/package-lock.json ./
 
 RUN npm install --omit=dev
 
-COPY --from=builder /app/apps/auth-service/dist ./apps/auth-service/dist
+COPY --from=builder /app/apps/task-service/dist ./apps/task-service/dist
 COPY --from=builder /app/packages /app/packages
 
-# Copy package.json and TypeScript source files needed for migrations
-COPY --from=prepare /app/out/full/apps/auth-service/package.json ./apps/auth-service/
-COPY --from=prepare /app/out/full/apps/auth-service/src/data-source.ts ./apps/auth-service/src/
-COPY --from=prepare /app/out/full/apps/auth-service/src/migrations ./apps/auth-service/src/migrations/
-COPY --from=prepare /app/out/full/apps/auth-service/tsconfig.json ./apps/auth-service/
+COPY --from=prepare /app/out/full/apps/task-service/package.json ./apps/task-service/
+COPY --from=prepare /app/out/full/apps/task-service/src/data-source.ts ./apps/task-service/src/
+COPY --from=prepare /app/out/full/apps/task-service/src/migrations ./apps/task-service/src/migrations/
+COPY --from=prepare /app/out/full/apps/task-service/tsconfig.json ./apps/task-service/
 
 ENV NODE_PATH=./node_modules
 USER node
 
-ENTRYPOINT ["sh", "-c", "echo 'Running migrations...' && npm run migration:run --workspace=@repo/auth-service && echo 'Migrations ran successfully' && echo 'Starting the application...' && exec node apps/auth-service/dist/main.js"]
-# ENTRYPOINT ["sh", "-c", "echo 'Running migrations...' && npm run migration:run --workspace=@repo/auth-service && echo 'Migrations ran successfully' && echo 'Starting the application...' && exec \"$@\""]
-# CMD ["node", "apps/auth-service/dist/main.js"]
+ENTRYPOINT ["sh", "-c", "echo 'Running migrations...' && npm run migration:run --workspace=@repo/task-service && echo 'Migrations ran successfully' && echo 'Starting the application...' && exec node apps/task-service/dist/main.js"]

@@ -6,36 +6,20 @@ import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
 import { Task } from './entities/task.entity';
 import { TaskLog } from './entities/task-log.entity';
-import { RelUserTask } from './entities/rel-user-task';
-import { Auth } from '../auth/entities/auth.entity';
+import { RelUserTask } from './entities/rel-user-task.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Task, TaskLog, RelUserTask, Auth]),
+        TypeOrmModule.forFeature([Task, TaskLog, RelUserTask]),
         ClientsModule.registerAsync([
             {
-                name: 'TASKS_QUEUE',
+                name: 'TASK_SERVICE',
                 imports: [ConfigModule],
                 useFactory: (configService: ConfigService) => ({
                     transport: Transport.RMQ,
                     options: {
                         urls: [configService.get<string>('RABBITMQ_URL')!],
-                        queue: 'tasks_queue',
-                        queueOptions: {
-                            durable: false,
-                        },
-                    },
-                }),
-                inject: [ConfigService],
-            },
-            {
-                name: 'WS_NOTIFICATIONS_QUEUE',
-                imports: [ConfigModule],
-                useFactory: (configService: ConfigService) => ({
-                    transport: Transport.RMQ,
-                    options: {
-                        urls: [configService.get<string>('RABBITMQ_URL')!],
-                        queue: 'ws_notifications_queue',
+                        queue: configService.get<string>('RABBITMQ_QUEUE')!,
                         queueOptions: {
                             durable: false,
                         },

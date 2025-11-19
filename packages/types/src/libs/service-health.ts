@@ -1,11 +1,12 @@
 export enum ServiceHealthStatus {
-    Ok = 'OK',
-    Error = 'ERROR',
-    Undefined = 'UNDEFINED',
+  Ok = "OK",
+  Error = "ERROR",
+  Undefined = "UNDEFINED",
 }
 
 export class ServiceHealthDto {
-   status?: ServiceHealthStatus;
-   database?: ServiceHealthStatus;
-   rabbitMqClient?: ServiceHealthStatus;
+  name!: string;
+  status?: ServiceHealthStatus;
+  database?: ServiceHealthStatus;
+  rabbitMqClient?: ServiceHealthStatus;
 }

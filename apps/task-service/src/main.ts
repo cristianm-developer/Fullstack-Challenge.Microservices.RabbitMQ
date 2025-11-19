@@ -17,7 +17,7 @@ async function bootstrap() {
   await app.startAllMicroservices();
   await app.listen(HTTP_PORT);
 
-  logger.log(`Auth Service is running on port ${HTTP_PORT}`);
+  logger.log(`Task Service is running on port ${HTTP_PORT}`);
   logger.log(`RabbitMQ is running on ${configService.get<string>('RABBITMQ_URL')}`);
 }
 bootstrap();

@@ -1,3 +1,8 @@
+
+export class ListedUserDto {
+    id!: number;
+    username!: string;
+}
 export class LoginUserDto {
     usernameOrEmail!: string;
     password!: string;

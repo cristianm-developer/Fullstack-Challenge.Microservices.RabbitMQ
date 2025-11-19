@@ -2,12 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
 import { TaskLog } from './entities/task-log.entity';
-import { RelUserTask } from './entities/rel-user-task';
-import { Auth } from '../auth/entities/auth.entity';
+import { RelUserTask } from './entities/rel-user-task.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
-import { TaskPriority, TaskStatus } from './enum/tasks.enum';
 import { TasksService } from './tasks.service';
+import { CreateTaskDto, TaskPriority, TaskStatus } from '@repo/types';
+import { emit } from 'process';
 
 const mockTaskRepository = {
     save: jest.fn(),
@@ -34,17 +34,11 @@ const mockRelUserTaskRepository = {
     delete: jest.fn(),
 };
 
-const mockAuthRepository = {
-    findOne: jest.fn(),
-    findOneBy: jest.fn(),
-};
-
 describe('TasksService', () => {
     let service: TasksService;
     let taskRepository: Repository<Task>;
     let taskLogRepository: Repository<TaskLog>;
     let relUserTaskRepository: Repository<RelUserTask>;
-    let authRepository: Repository<Auth>;
 
     const mockTask = {
         id: 1,
@@ -66,10 +60,20 @@ describe('TasksService', () => {
         updatedAt: new Date(),
     };
 
+    const mockTaskClient = {
+        emit: jest.fn().mockReturnValue({
+            toPromise: jest.fn().mockResolvedValue(true),
+        }),
+    }
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 TasksService,
+                {
+                    provide: 'TASK_SERVICE',
+                    useValue: mockTaskClient,
+                },
                 {
                     provide: getRepositoryToken(Task),
                     useValue: mockTaskRepository,
@@ -81,11 +85,7 @@ describe('TasksService', () => {
                 {
                     provide: getRepositoryToken(RelUserTask),
                     useValue: mockRelUserTaskRepository,
-                },
-                {
-                    provide: getRepositoryToken(Auth),
-                    useValue: mockAuthRepository,
-                },
+                }      
             ],
         }).compile();
 
@@ -97,7 +97,6 @@ describe('TasksService', () => {
         relUserTaskRepository = module.get<Repository<RelUserTask>>(
             getRepositoryToken(RelUserTask),
         );
-        authRepository = module.get<Repository<Auth>>(getRepositoryToken(Auth));
 
         jest.clearAllMocks();
     });
@@ -107,13 +106,20 @@ describe('TasksService', () => {
     });
 
     describe('create', () => {
+
+        it('should be defined', () => {
+            expect(service.create).toBeDefined();
+        });
+
+
         it('should create a task successfully and return success message', async () => {
-            const createTaskDto = {
+            const createTaskDto: CreateTaskDto = {
                 title: 'New Task',
                 description: 'Task Description',
                 prazo: new Date('2024-12-31'),
                 priority: TaskPriority.HIGH,
                 userIds: [1],
+                creatorId: 1,
             };
 
             mockTaskRepository.create.mockReturnValue({
@@ -127,7 +133,7 @@ describe('TasksService', () => {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
-            mockAuthRepository.findOne.mockResolvedValue(mockUser);
+
             mockRelUserTaskRepository.create.mockReturnValue({
                 taskId: 1,
                 userId: 1,
@@ -146,12 +152,14 @@ describe('TasksService', () => {
             expect(taskRepository.save).toHaveBeenCalled();
             expect(result).toBeDefined();
             expect(result.message).toBe('Tarefa criada com sucesso');
+            expect(result.data?.id).toBeDefined();
         });
 
         it('should create a task with default priority and status', async () => {
             const createTaskDto = {
                 title: 'New Task',
                 userIds: [1],
+                creatorId: 1,
             };
 
             mockTaskRepository.create.mockReturnValue({
@@ -167,7 +175,6 @@ describe('TasksService', () => {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
-            mockAuthRepository.findOne.mockResolvedValue(mockUser);
             mockRelUserTaskRepository.create.mockReturnValue({
                 taskId: 1,
                 userId: 1,
@@ -187,6 +194,11 @@ describe('TasksService', () => {
     });
 
     describe('update', () => {
+
+        it('should be defined', () => {
+            expect(service.update).toBeDefined();
+        });
+
         it('should update a task successfully and return success message', async () => {
             const updateTaskDto = {
                 id: 1,
@@ -204,9 +216,7 @@ describe('TasksService', () => {
 
             const result = await service.update(updateTaskDto);
 
-            expect(taskRepository.findOne).toHaveBeenCalledWith({
-                where: { id: updateTaskDto.id },
-            });
+            expect(taskRepository.findOne).toHaveBeenCalled();
             expect(taskRepository.save).toHaveBeenCalled();
             expect(result).toBeDefined();
             expect(result.message).toBe('Tarefa atualizada com sucesso');
@@ -296,7 +306,7 @@ describe('TasksService', () => {
                 relations: ['userTasks', 'userTasks.user', 'comments', 'auditLogs'],
             });
             expect(result).toBeDefined();
-            expect(result[0].status).toBe(TaskStatus.TODO);
+            expect(result[0]?.status).toBe(TaskStatus.TODO);
         });
 
         it('should find tasks filtered by priority', async () => {
@@ -310,7 +320,7 @@ describe('TasksService', () => {
                 relations: ['userTasks', 'userTasks.user', 'comments', 'auditLogs'],
             });
             expect(result).toBeDefined();
-            expect(result[0].priority).toBe(TaskPriority.HIGH);
+            expect(result[0]?.priority).toBe(TaskPriority.HIGH);
         });
 
         it('should find tasks filtered by status and priority', async () => {
@@ -336,8 +346,8 @@ describe('TasksService', () => {
                 relations: ['userTasks', 'userTasks.user', 'comments', 'auditLogs'],
             });
             expect(result).toBeDefined();
-            expect(result[0].status).toBe(TaskStatus.IN_PROGRESS);
-            expect(result[0].priority).toBe(TaskPriority.URGENT);
+            expect(result[0]?.status).toBe(TaskStatus.IN_PROGRESS);
+            expect(result[0]?.priority).toBe(TaskPriority.URGENT);
         });
 
         it('should find tasks filtered by userId', async () => {
@@ -365,7 +375,6 @@ describe('TasksService', () => {
             };
 
             mockTaskRepository.findOne.mockResolvedValue(mockTask);
-            mockAuthRepository.findOne.mockResolvedValue(mockUser);
             mockTaskLogRepository.create.mockReturnValue({
                 ...logDto,
                 createdAt: new Date(),
@@ -381,9 +390,7 @@ describe('TasksService', () => {
             expect(taskRepository.findOne).toHaveBeenCalledWith({
                 where: { id: logDto.taskId },
             });
-            expect(authRepository.findOne).toHaveBeenCalledWith({
-                where: { id: logDto.userId },
-            });
+      
             expect(taskLogRepository.create).toHaveBeenCalled();
             expect(taskLogRepository.save).toHaveBeenCalled();
             expect(result).toBeDefined();
@@ -407,23 +414,6 @@ describe('TasksService', () => {
             );
         });
 
-        it('should throw an error with portuguese message if user does not exist when adding log', async () => {
-            const logDto = {
-                taskId: 1,
-                userId: 999,
-                change: 'Some change',
-            };
-
-            mockTaskRepository.findOne.mockResolvedValue(mockTask);
-            mockAuthRepository.findOne.mockResolvedValue(null);
-
-            await expect(service.addLog(logDto)).rejects.toThrow(
-                NotFoundException,
-            );
-            await expect(service.addLog(logDto)).rejects.toThrow(
-                'O usuario nao existe.',
-            );
-        });
     });
 });
 

@@ -1,32 +1,36 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { TasksService } from './tasks.service';
+import { AddLogDto, CreateTaskDto, FindAllFilters, TASK_PATTERNS, UpdateTaskDto } from '@repo/types';
 
 @Controller()
 export class TasksController {
     constructor(private readonly tasksService: TasksService) {}
 
-    @MessagePattern('task update')
-    async handleTaskUpdate(@Payload() payload: any) {
-        const { taskId, action, task, userId } = payload;
-
-        if (!taskId || !task) {
-            return { success: false, error: 'Missing required fields' };
-        }
-
-        // Create log entry for the update
-        const changeMessage = `Tarefa ${action === 'created' ? 'criada' : 'atualizada'}: ${task.title}`;
-        
-        // Use userId from payload, or try to get from task if available
-        const logUserId = userId || task.userId || 1;
-
-        await this.tasksService.addLog({
-            taskId,
-            userId: logUserId,
-            change: changeMessage,
-        });
-
-        return { success: true };
+    @MessagePattern(TASK_PATTERNS.CREATE_TASK)
+    async create(@Payload() createTaskDto: CreateTaskDto) {
+        return await this.tasksService.create(createTaskDto);
     }
+
+    @MessagePattern(TASK_PATTERNS.UPDATE_TASK)
+    async update(@Payload() updateTaskDto: UpdateTaskDto) {
+        return await this.tasksService.update(updateTaskDto);
+    }
+
+    @MessagePattern(TASK_PATTERNS.FIND_ALL_TASKS)
+    async findAll(@Payload() filters?: FindAllFilters) {
+        return await this.tasksService.findAll(filters);
+    }
+
+    @MessagePattern(TASK_PATTERNS.FIND_ONE_TASK)
+    async findOne(@Payload() id: number) {
+        return await this.tasksService.findOne(id);
+    }
+
+    @MessagePattern(TASK_PATTERNS.ADD_TASK_LOG)
+    async addLog(@Payload() logDto: AddLogDto) {
+        return await this.tasksService.addLog(logDto);
+    }
+
 }
 

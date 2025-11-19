@@ -7,7 +7,6 @@ import {
     PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Task } from './task.entity';
-import { Auth } from '../../auth/entities/auth.entity';
 
 @Entity('task_log')
 export class TaskLog {
@@ -26,14 +25,7 @@ export class TaskLog {
         nullable: false,
     })
     taskId!: number;
-
-    @ManyToOne(() => Auth, {
-        onDelete: 'CASCADE',
-        nullable: false,
-    })
-    @JoinColumn({ name: 'userId' })
-    user!: Auth;
-
+    
     @Column({
         name: 'userId',
         nullable: false,

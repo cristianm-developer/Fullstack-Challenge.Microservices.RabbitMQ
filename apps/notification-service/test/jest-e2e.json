@@ -1,0 +1,24 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testRegex": ".e2e-spec.ts$",
+  "noStackTrace": true,
+  "silent": true,
+  "verbose": false,
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.spec.json"
+      }
+    ]
+  },
+  "moduleNameMapper": {
+    "^@repo/types$": "<rootDir>/../../../packages/types/dist/cjs/index.js",
+    "^@repo/types/(.*)$": "<rootDir>/../../../packages/types/dist/cjs/libs/$1.js",
+    "^@repo/microservice-logging-module$": "<rootDir>/../../../packages/nest-modules/microservice-logging-module/dist/cjs/index.js",
+    "^@repo/microservice-health-module$": "<rootDir>/../../../packages/nest-modules/microservice-health-module/dist/cjs/index.js"
+  }
+}

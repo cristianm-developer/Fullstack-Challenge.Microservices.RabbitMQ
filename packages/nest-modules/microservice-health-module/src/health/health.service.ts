@@ -12,7 +12,8 @@ export class HealthService {
         @Optional() private db: TypeOrmHealthIndicator,
         private memory: MemoryHealthIndicator,
         private disk: DiskHealthIndicator,
-        @Inject(RMQ_HEALTH_OPTIONS) private rmqUrls: string[]
+        @Inject(RMQ_HEALTH_OPTIONS) private rmqUrls: string[],
+        @Inject('INCLUDE_DB') private includeDb: boolean
     ){}
 
     async checkAllDependencies() {
@@ -28,7 +29,6 @@ export class HealthService {
         const rootPath = os.platform() === 'win32' ? 'C:\\' : '/';
         const mandatoryChecks = [
             () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
-            // () => this.memory.checkRSS('memory_rss', 150 * 1024 * 1024),
             () => this.disk.checkStorage('disk_storage', {
                 thresholdPercent: 0.9,
                 path: rootPath                
@@ -36,7 +36,7 @@ export class HealthService {
             ...rmqChecks
         ];
 
-        const allChecks = this.db ? [...mandatoryChecks, () => this.db.pingCheck('database')] : mandatoryChecks;
+        const allChecks = this.includeDb ? [...mandatoryChecks, () => this.db.pingCheck('database')] : mandatoryChecks;
 
         return this.health.check(allChecks);
     }

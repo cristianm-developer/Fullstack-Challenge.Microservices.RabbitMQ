@@ -56,7 +56,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB_AUTH_DB}
       - RABBITMQ_QUEUE=${RABBITMQ_AUTH_QUEUE}
     ports:
-      - ${HTTP_PORT}:${HTTP_PORT}
+      - ${AUTH_PORT}:${HTTP_PORT}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -70,6 +70,77 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+  task-service:
+    build:
+      context: .
+      dockerfile: ./apps/task-service/Dockerfile
+    container_name: task-service
+    env_file:
+      - .env.example
+    restart: on-failure
+    environment:
+      - PORT=${HTTP_PORT}
+      - POSTGRES_DB=${POSTGRES_DB_TASK_DB}
+      - RABBITMQ_QUEUE=${RABBITMQ_TASK_QUEUE}
+    ports:
+      - ${TASK_PORT}:${HTTP_PORT}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - junglegaming-challenge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./apps/notification-service/Dockerfile
+    container_name: notification-service
+    env_file:
+      - .env.example
+    restart: on-failure
+    environment:
+      - PORT=${HTTP_PORT}
+      - RABBITMQ_QUEUE=${RABBITMQ_NOTIFICATIONS_QUEUE}    
+    ports:
+      - ${NOTIFICATION_PORT}:${HTTP_PORT}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - junglegaming-challenge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HTTP_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  api-service:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile
+    container_name: api-service
+    env_file:
+      - .env.example
+    restart: on-failure
+    environment:
+      - PORT=${HTTP_PORT}
+      - WS_HOST=${WS_HOST}
+    ports:
+      - ${API_GATEWAY_PORT}:${HTTP_PORT}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - junglegaming-challenge-network
 
 volumes:
   postgres_data:

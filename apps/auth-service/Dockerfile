@@ -34,7 +34,6 @@ RUN npm install --omit=dev
 COPY --from=builder /app/apps/auth-service/dist ./apps/auth-service/dist
 COPY --from=builder /app/packages /app/packages
 
-# Copy package.json and TypeScript source files needed for migrations
 COPY --from=prepare /app/out/full/apps/auth-service/package.json ./apps/auth-service/
 COPY --from=prepare /app/out/full/apps/auth-service/src/data-source.ts ./apps/auth-service/src/
 COPY --from=prepare /app/out/full/apps/auth-service/src/migrations ./apps/auth-service/src/migrations/
@@ -44,5 +43,3 @@ ENV NODE_PATH=./node_modules
 USER node
 
 ENTRYPOINT ["sh", "-c", "echo 'Running migrations...' && npm run migration:run --workspace=@repo/auth-service && echo 'Migrations ran successfully' && echo 'Starting the application...' && exec node apps/auth-service/dist/main.js"]
-# ENTRYPOINT ["sh", "-c", "echo 'Running migrations...' && npm run migration:run --workspace=@repo/auth-service && echo 'Migrations ran successfully' && echo 'Starting the application...' && exec \"$@\""]
-# CMD ["node", "apps/auth-service/dist/main.js"]

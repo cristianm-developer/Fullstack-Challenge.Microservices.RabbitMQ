@@ -6,16 +6,23 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { Comment } from './comment.entity';
+import { Comment } from '../../comments/entities/comment.entity';
 import { TaskLog } from './task-log.entity';
-import { RelUserTask } from './rel-user-task';
-import { TaskPriority, TaskStatus } from '../enum/tasks.enum';
+import { RelUserTask } from './rel-user-task.entity';
+import { TaskPriority, TaskStatus } from '@repo/types';
 
 
 @Entity('task')
 export class Task {
     @PrimaryGeneratedColumn('increment')
     id!: number;
+
+    @Column({
+        type: 'int',
+        nullable: false,
+        name: 'user_id',
+    })
+    userId!: number;
 
     @Column({
         length: 255,
@@ -35,7 +42,7 @@ export class Task {
         nullable: true,
         name: 'deadline',
     })
-    prazo?: Date;
+    deadline?: Date;
 
     @Column({
         type: 'enum',

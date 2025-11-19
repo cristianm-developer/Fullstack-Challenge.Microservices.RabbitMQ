@@ -1,47 +1,17 @@
 import {
+    Inject,
     Injectable,
     NotFoundException,
-    Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ClientProxy } from '@nestjs/microservices';
-import { ConfigService } from '@nestjs/config';
 import { Task } from './entities/task.entity';
 import { TaskLog } from './entities/task-log.entity';
-import { RelUserTask } from './entities/rel-user-task';
-import { Auth } from '../auth/entities/auth.entity';
-import { TaskPriority, TaskStatus } from './enum/tasks.enum';
+import { RelUserTask } from './entities/rel-user-task.entity';
+import { AddLogDto, CreateTaskDto, FindAllFilters, ResponseDto, TASK_PATTERNS, TaskPriority, TaskStatus, UpdateTaskDto } from '@repo/types';
 
-interface CreateTaskDto {
-    title: string;
-    description?: string;
-    prazo?: Date;
-    priority?: TaskPriority;
-    userIds: number[];
-}
 
-interface UpdateTaskDto {
-    id: number;
-    title?: string;
-    description?: string;
-    prazo?: Date;
-    priority?: TaskPriority;
-    status?: TaskStatus;
-    userId?: number;
-}
-
-interface FindAllFilters {
-    status?: TaskStatus;
-    priority?: TaskPriority;
-    userId?: number;
-}
-
-interface AddLogDto {
-    taskId: number;
-    userId: number;
-    change: string;
-}
 
 @Injectable()
 export class TasksService {
@@ -52,101 +22,98 @@ export class TasksService {
         private readonly taskLogRepository: Repository<TaskLog>,
         @InjectRepository(RelUserTask)
         private readonly relUserTaskRepository: Repository<RelUserTask>,
-        @InjectRepository(Auth)
-        private readonly authRepository: Repository<Auth>,
-        @Inject('TASKS_QUEUE')
-        private readonly tasksQueueClient: ClientProxy,
-        @Inject('WS_NOTIFICATIONS_QUEUE')
-        private readonly wsNotificationsQueueClient: ClientProxy,
-        private readonly configService: ConfigService,
+        @Inject('TASK_SERVICE')
+        private readonly taskClient: ClientProxy,
     ) {}
 
-    async create(createTaskDto: CreateTaskDto) {
+    async create(createTaskDto: CreateTaskDto): Promise<ResponseDto<Task>> {
         const task = this.taskRepository.create({
             title: createTaskDto.title,
             description: createTaskDto.description,
-            prazo: createTaskDto.prazo,
+            deadline: createTaskDto.prazo,
             priority: createTaskDto.priority || TaskPriority.MEDIUM,
             status: TaskStatus.TODO,
+            userId: createTaskDto.creatorId,
         });
 
         const savedTask = await this.taskRepository.save(task);
 
-        // Assign users to task
         if (createTaskDto.userIds && createTaskDto.userIds.length > 0) {
             for (const userId of createTaskDto.userIds) {
-                const user = await this.authRepository.findOne({
-                    where: { id: userId },
+                const relUserTask = this.relUserTaskRepository.create({
+                    taskId: savedTask.id,
+                    userId: userId,
                 });
-
-                if (user) {
-                    const relUserTask = this.relUserTaskRepository.create({
-                        taskId: savedTask.id,
-                        userId: user.id,
-                    });
-                    await this.relUserTaskRepository.save(relUserTask);
-                }
+                await this.relUserTaskRepository.save(relUserTask);
             }
         }
 
-        // Send message to tasks_queue
-        const firstUserId = createTaskDto.userIds && createTaskDto.userIds.length > 0 
-            ? createTaskDto.userIds[0] 
-            : null;
-        
-        this.tasksQueueClient.emit('task update', {
+        this.taskClient.emit(TASK_PATTERNS.ADD_TASK_LOG, {
             taskId: savedTask.id,
-            action: 'created',
-            task: savedTask,
-            userId: firstUserId,
+            userId: savedTask.userId,
+            change: `Tarefa criada: ${savedTask.title}, data: ${JSON.stringify(savedTask)}`,
         });
 
-        return { message: 'Tarefa criada com sucesso' };
+        return { message: 'Tarefa criada com sucesso', data: savedTask };
     }
 
     async update(updateTaskDto: UpdateTaskDto) {
         const task = await this.taskRepository.findOne({
             where: { id: updateTaskDto.id },
+            relations: [ 'userTasks' ],
         });
 
         if (!task) {
             throw new NotFoundException('A tarefa nao existe.');
         }
 
-        if (updateTaskDto.title !== undefined) {
-            task.title = updateTaskDto.title;
-        }
-        if (updateTaskDto.description !== undefined) {
-            task.description = updateTaskDto.description;
-        }
-        if (updateTaskDto.prazo !== undefined) {
-            task.prazo = updateTaskDto.prazo;
-        }
-        if (updateTaskDto.priority !== undefined) {
-            task.priority = updateTaskDto.priority;
-        }
-        if (updateTaskDto.status !== undefined) {
-            task.status = updateTaskDto.status;
+        task.title = updateTaskDto.title ?? task.title;
+        task.description = updateTaskDto.description ?? task.description;
+        task.deadline = updateTaskDto.deadline ?? task.deadline;
+        task.priority = updateTaskDto.priority ?? task.priority;
+        task.status = updateTaskDto.status ?? task.status;
+        let usersToAdd: number[] = [];
+        let usersToRemove: number[] = [];
+
+        if(updateTaskDto.userIds !== undefined) {
+            const currentUsers = task.userTasks.map(ut => ut.userId);
+            const incomingUsers = updateTaskDto.userIds;
+
+            usersToAdd = incomingUsers.filter(id => !currentUsers.includes(id));
+            usersToRemove = currentUsers.filter(id => !incomingUsers.includes(id));
+
+            if(usersToRemove.length > 0) {
+                await this.relUserTaskRepository.delete({
+                    taskId: task.id,
+                    userId: In(usersToRemove),
+                })
+            }
+
+            if(usersToAdd.length > 0) {
+                const newUserTask =  usersToAdd.map(userId => this.relUserTaskRepository.create({
+                    taskId: task.id,
+                    userId: userId,
+                }));
+                await this.relUserTaskRepository.save(newUserTask);
+            }
+
         }
 
         const updatedTask = await this.taskRepository.save(task);
 
-        // Get userId from DTO or try to get from task's assigned users
-        let userId: number | undefined = updateTaskDto.userId;
-        if (!userId) {
-            const userTasks = await this.relUserTaskRepository.find({
-                where: { taskId: updatedTask.id },
-                take: 1,
-            });
-            userId = userTasks.length > 0 && userTasks[0] ? userTasks[0].userId : undefined;
+        const changes = {
+            title: updateTaskDto.title !== undefined ? `Título: ${updateTaskDto.title}` : null,
+            description: updateTaskDto.description !== undefined ? `Descrição: ${updateTaskDto.description}` : null,
+            deadline: updateTaskDto.deadline !== undefined ? `Prazo: ${updateTaskDto.deadline}` : null,
+            priority: updateTaskDto.priority !== undefined ? `Prioridade: ${updateTaskDto.priority}` : null,
+            status: updateTaskDto.status !== undefined ? `Status: ${updateTaskDto.status}` : null,
+            users: usersToAdd.length > 0 || usersToRemove.length > 0 ? `Usuários Add/Remove: ${usersToAdd.join(', ')} ${usersToRemove.length > 0 ? `- ${usersToRemove.join(', ')}` : ''}` : null,
         }
 
-        // Send message to tasks_queue
-        this.tasksQueueClient.emit('task update', {
+        this.taskClient.emit(TASK_PATTERNS.ADD_TASK_LOG, {
             taskId: updatedTask.id,
-            action: 'updated',
-            task: updatedTask,
-            userId: userId,
+            userId: updatedTask.userId,
+            change: `Tarefa atualizada: ${updatedTask.title}, data: ${JSON.stringify(changes)}`,
         });
 
         return { message: 'Tarefa atualizada com sucesso' };
@@ -185,7 +152,6 @@ export class TasksService {
 
             let tasks = relUserTasks.map((rel) => rel.task);
 
-            // Apply additional filters
             if (filters.status) {
                 tasks = tasks.filter((task) => task.status === filters.status);
             }
@@ -226,14 +192,6 @@ export class TasksService {
             throw new NotFoundException('A tarefa nao existe.');
         }
 
-        const user = await this.authRepository.findOne({
-            where: { id: logDto.userId },
-        });
-
-        if (!user) {
-            throw new NotFoundException('O usuario nao existe.');
-        }
-
         const taskLog = this.taskLogRepository.create({
             taskId: logDto.taskId,
             userId: logDto.userId,
@@ -241,14 +199,6 @@ export class TasksService {
         });
 
         const savedLog = await this.taskLogRepository.save(taskLog);
-
-        // Send message to ws_notifications_queue
-        this.wsNotificationsQueueClient.emit('notification', {
-            taskId: logDto.taskId,
-            userId: logDto.userId,
-            change: logDto.change,
-            logId: savedLog.id,
-        });
 
         return savedLog;
     }
